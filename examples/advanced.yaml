@@ -2,18 +2,18 @@
 # Full configuration with all available options
 
 esphome:
-  name: tcl-ac-advanced
+  name: hvac-esp32
   friendly_name: "Living Room AC"
 
 # ESP8266 configuration
-esp8266:
-  board: d1_mini
+#esp8266:
+#  board: d1_mini
 
 # OR use ESP32 for more features:
-# esp32:
-#   board: esp32dev
-#   framework:
-#     type: arduino
+esp32:
+  board: esp32dev
+  framework:
+   type: arduino
 
 # OR use ESP32-S3:
 # esp32:
@@ -26,10 +26,10 @@ wifi:
   password: !secret wifi_password
   
   # Static IP (optional)
-  manual_ip:
-    static_ip: 192.168.1.100
-    gateway: 192.168.1.1
-    subnet: 255.255.255.0
+  #manual_ip:
+  #  static_ip: 192.168.1.100
+  #  gateway: 192.168.1.1
+  #  subnet: 255.255.255.0
   
   # Fallback hotspot
   ap:
@@ -48,7 +48,7 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: !secret api_key
+    key: !secret api_encryption_key
     # Generate key with: esphome config [file] | grep "api_key:"
     # Or use: openssl rand -base64 32
 
@@ -58,11 +58,11 @@ ota:
     password: !secret ota_password
 
 # Web server for local access (optional)
-web_server:
-  port: 80
-  auth:
-    username: admin
-    password: !secret web_password
+#web_server:
+#  port: 80
+#  auth:
+#    username: admin
+#    password: !secret web_password
 
 # UART for AC communication
 uart:
@@ -84,7 +84,7 @@ uart:
 
 # External component from GitHub
 external_components:
-  - source: github://Kannix2005/esphome-tcl-ac
+  - source: github://alacuraz/esphome-tcl-ac
     components: [ tcl_ac ]
     refresh: 1d  # Check for updates daily
 
@@ -117,8 +117,8 @@ climate:
     # Callbacks for state changes (optional)
     on_state:
       - logger.log:
-          format: "AC state changed: Mode=%s, Temp=%.1f°C"
-          args: ['id(my_ac).mode.c_str()', 'id(my_ac).target_temperature']
+          format: "AC state changed: Mode=%d, Temp=%.1f°C"
+          args: ['static_cast<int>(id(my_ac).mode)', 'id(my_ac).target_temperature']
 
 # Optional: Binary sensors
 binary_sensor:
@@ -157,13 +157,13 @@ text_sensor:
     icon: "mdi:arrow-up-down"
     update_interval: 5s
     lambda: |-
-      auto pos = id(my_ac)->get_vertical_position();
+      auto pos = id(my_ac)->get_vertical_airflow();
       switch(pos) {
-        case 0: return {"Max Up"};
-        case 1: return {"Up"};
-        case 2: return {"Center"};
-        case 3: return {"Down"};
-        case 4: return {"Max Down"};
+        case esphome::tcl_ac::AirflowVerticalDirection::MAX_UP: return {"Max Up"};
+        case esphome::tcl_ac::AirflowVerticalDirection::UP: return {"Up"};
+        case esphome::tcl_ac::AirflowVerticalDirection::CENTER: return {"Center"};
+        case esphome::tcl_ac::AirflowVerticalDirection::DOWN: return {"Down"};
+        case esphome::tcl_ac::AirflowVerticalDirection::MAX_DOWN: return {"Max Down"};
         default: return {"Unknown"};
       }
   
@@ -173,13 +173,13 @@ text_sensor:
     icon: "mdi:arrow-left-right"
     update_interval: 5s
     lambda: |-
-      auto pos = id(my_ac)->get_horizontal_position();
+      auto pos = id(my_ac)->get_horizontal_airflow();
       switch(pos) {
-        case 0: return {"Max Left"};
-        case 1: return {"Left"};
-        case 2: return {"Center"};
-        case 3: return {"Right"};
-        case 4: return {"Max Right"};
+        case esphome::tcl_ac::AirflowHorizontalDirection::MAX_LEFT: return {"Max Left"};
+        case esphome::tcl_ac::AirflowHorizontalDirection::LEFT: return {"Left"};
+        case esphome::tcl_ac::AirflowHorizontalDirection::CENTER: return {"Center"};
+        case esphome::tcl_ac::AirflowHorizontalDirection::RIGHT: return {"Right"};
+        case esphome::tcl_ac::AirflowHorizontalDirection::MAX_RIGHT: return {"Max Right"};
         default: return {"Unknown"};
       }
   
@@ -191,11 +191,10 @@ text_sensor:
     lambda: |-
       auto swing = id(my_ac)->get_vertical_swing();
       switch(swing) {
-        case 0: return {"Fixed"};
-        case 1: return {"Top Zone"};
-        case 2: return {"Middle Zone"};
-        case 3: return {"Bottom Zone"};
-        case 4: return {"Full Swing"};
+        case esphome::tcl_ac::VerticalSwingDirection::OFF: return {"Fixed"};
+        case esphome::tcl_ac::VerticalSwingDirection::UP_DOWN: return {"Top Zone"};
+        case esphome::tcl_ac::VerticalSwingDirection::UPSIDE: return {"Middle Zone"};
+        case esphome::tcl_ac::VerticalSwingDirection::DOWNSIDE: return {"Bottom Zone"};
         default: return {"Unknown"};
       }
   
@@ -207,11 +206,11 @@ text_sensor:
     lambda: |-
       auto swing = id(my_ac)->get_horizontal_swing();
       switch(swing) {
-        case 0: return {"Fixed"};
-        case 1: return {"Left Zone"};
-        case 2: return {"Center Zone"};
-        case 3: return {"Right Zone"};
-        case 4: return {"Full Swing"};
+        case esphome::tcl_ac::HorizontalSwingDirection::OFF: return {"Fixed"};
+        case esphome::tcl_ac::HorizontalSwingDirection::LEFT_RIGHT: return {"Left Zone"};
+        case esphome::tcl_ac::HorizontalSwingDirection::LEFTSIDE: return {"Center Zone"};
+        case esphome::tcl_ac::HorizontalSwingDirection::CENTER: return {"Right Zone"};
+        case esphome::tcl_ac::HorizontalSwingDirection::RIGHTSIDE: return {"Full Swing"};
         default: return {"Unknown"};
       }
 
@@ -235,9 +234,9 @@ switch:
     icon: "mdi:television"
     optimistic: true
     turn_on_action:
-      - lambda: 'id(my_ac)->set_display(true);'
+      - lambda: 'id(my_ac)->set_display_state(true);'
     turn_off_action:
-      - lambda: 'id(my_ac)->set_display(false);'
+      - lambda: 'id(my_ac)->set_display_state(false);'
   
   # Beeper Control
   - platform: template
@@ -246,9 +245,9 @@ switch:
     icon: "mdi:volume-high"
     optimistic: true
     turn_on_action:
-      - lambda: 'id(my_ac)->set_beeper(true);'
+      - lambda: 'id(my_ac)->set_beeper_state(true);'
     turn_off_action:
-      - lambda: 'id(my_ac)->set_beeper(false);'
+      - lambda: 'id(my_ac)->set_beeper_state(false);'
   
   # Restart button
   - platform: restart
@@ -277,7 +276,7 @@ select:
           else if (x == "Center") pos = 2;
           else if (x == "Down") pos = 3;
           else if (x == "Max Down") pos = 4;
-          id(my_ac)->set_vertical_position(pos);
+          id(my_ac)->set_vertical_airflow(static_cast<esphome::tcl_ac::AirflowVerticalDirection>(pos + 1));
   
   # Horizontal fixed position control
   - platform: template
@@ -300,7 +299,7 @@ select:
           else if (x == "Center") pos = 2;
           else if (x == "Right") pos = 3;
           else if (x == "Max Right") pos = 4;
-          id(my_ac)->set_horizontal_position(pos);
+          id(my_ac)->set_horizontal_airflow(static_cast<esphome::tcl_ac::AirflowHorizontalDirection>(pos + 1));
   
   # Vertical swing direction control
   - platform: template
@@ -323,7 +322,7 @@ select:
           else if (x == "Middle Zone") swing = 2;
           else if (x == "Bottom Zone") swing = 3;
           else if (x == "Full Swing") swing = 4;
-          id(my_ac)->set_vertical_swing(swing);
+          id(my_ac)->set_vertical_swing(static_cast<esphome::tcl_ac::VerticalSwingDirection>(swing));
   
   # Horizontal swing direction control
   - platform: template
@@ -346,7 +345,7 @@ select:
           else if (x == "Center Zone") swing = 2;
           else if (x == "Right Zone") swing = 3;
           else if (x == "Full Swing") swing = 4;
-          id(my_ac)->set_horizontal_swing(swing);
+          id(my_ac)->set_horizontal_swing(static_cast<esphome::tcl_ac::HorizontalSwingDirection>(swing));
 
 # Optional: Status LED
 status_led:
